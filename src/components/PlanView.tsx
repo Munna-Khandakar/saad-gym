@@ -1,0 +1,145 @@
+"use client";
+
+import Link from "next/link";
+import { ArrowLeft, Hourglass } from "lucide-react";
+
+import { CycleTracker } from "@/components/CycleTracker";
+import { DaySelector, dayTabId } from "@/components/DaySelector";
+import { ProgressTracker } from "@/components/ProgressTracker";
+import { WorkoutCard } from "@/components/WorkoutCard";
+import { getChecklist, getDay, getPlan } from "@/data/workouts";
+import { useWorkoutProgress } from "@/hooks/useWorkoutProgress";
+import type { PlanId, WorkoutPlan } from "@/types/workout";
+
+const DAY_PANEL_ID = "workout-panel";
+
+function PlanHeader({ plan }: { plan: WorkoutPlan | null }) {
+  return (
+    <header className="flex items-center gap-3">
+      <Link
+        href="/"
+        aria-label="Back to home"
+        className="grid size-11 shrink-0 place-items-center rounded-xl border border-border bg-card outline-none transition-colors hover:border-primary/60 hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/60 active:scale-95"
+      >
+        <ArrowLeft className="size-5" aria-hidden />
+      </Link>
+      <div className="min-w-0">
+        <p className="text-[11px] font-bold tracking-widest text-muted-foreground uppercase">
+          SAAD <span className="text-primary">GYM</span>
+        </p>
+        {plan ? (
+          <h1 className="text-2xl leading-tight font-black tracking-tight">{plan.name}</h1>
+        ) : (
+          <div aria-hidden className="mt-1 h-7 w-24 animate-pulse rounded bg-card" />
+        )}
+      </div>
+    </header>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div aria-hidden className="animate-pulse space-y-6">
+      <div className="h-[104px] rounded-3xl bg-card" />
+      <div className="-mx-4 flex gap-2.5 overflow-hidden px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:px-0 md:grid-cols-6">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="h-[92px] w-[128px] shrink-0 rounded-2xl bg-card sm:w-auto" />
+        ))}
+      </div>
+      <div className="h-[126px] rounded-3xl bg-card" />
+      <div className="space-y-2.5">
+        {Array.from({ length: 5 }, (_, i) => (
+          <div key={i} className="h-[76px] rounded-2xl bg-card" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EmptyPlan({ plan }: { plan: WorkoutPlan }) {
+  return (
+    <div className="flex animate-rise-in flex-col items-center rounded-3xl border border-dashed border-white/15 bg-card/50 px-6 py-12 text-center">
+      <div className="grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
+        <Hourglass className="size-6" aria-hidden />
+      </div>
+      <p className="mt-4 text-lg font-bold">{plan.name} is coming soon</p>
+      <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+        Exercises for this plan haven&apos;t been added yet.
+      </p>
+    </div>
+  );
+}
+
+/** Shown while the route's URL params resolve. */
+export function PlanViewFallback() {
+  return (
+    <>
+      <PlanHeader plan={null} />
+      <div className="mt-8">
+        <LoadingSkeleton />
+      </div>
+    </>
+  );
+}
+
+export function PlanView({ planId }: { planId: PlanId }) {
+  const {
+    hydrated,
+    selectedDay,
+    selectDay,
+    isCompleted,
+    setCompleted,
+    resetDay,
+    resetCycle,
+    progressFor,
+    cycleFor,
+  } = useWorkoutProgress();
+
+  const plan = getPlan(planId);
+  const day = selectedDay === null ? null : getDay(plan, selectedDay);
+  const progress = day ? progressFor(day) : null;
+
+  return (
+    <>
+      <PlanHeader plan={plan} />
+
+      <div className="mt-8">
+        {plan.days.length === 0 ? (
+          <EmptyPlan plan={plan} />
+        ) : !hydrated || !day || !progress ? (
+          <LoadingSkeleton />
+        ) : (
+          <div className="space-y-6">
+            <CycleTracker
+              plan={plan}
+              cycle={cycleFor(plan)}
+              progressFor={progressFor}
+              onStartNewCycle={() => {
+                resetCycle(plan);
+                selectDay(plan.days[0].id);
+              }}
+            />
+            <DaySelector
+              days={plan.days}
+              selectedDay={day.id}
+              onSelect={selectDay}
+              progressFor={progressFor}
+              panelId={DAY_PANEL_ID}
+            />
+            <ProgressTracker day={day} progress={progress} />
+            <WorkoutCard
+              key={day.id}
+              day={day}
+              id={DAY_PANEL_ID}
+              labelledBy={dayTabId(day.id)}
+              isCompleted={isCompleted}
+              onToggle={setCompleted}
+              onReset={() => resetDay(day)}
+              hasProgress={getChecklist(day).some((item) => isCompleted(item.id))}
+            />
+          </div>
+        )}
+      </div>
+    </>
+  );
+}

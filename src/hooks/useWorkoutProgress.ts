@@ -4,20 +4,40 @@ import { useCallback, useSyncExternalStore } from "react";
 
 import {
   getNextExpiry,
+  isValidWeight,
   readCompletions,
   readSelectedDay,
-  STORAGE_KEY,
+  readSelectedLevel,
+  readWeights,
   SELECTED_DAY_KEY,
+  SELECTED_LEVEL_KEY,
+  STORAGE_KEY,
+  WEIGHTS_KEY,
   writeCompletions,
   writeSelectedDay,
+  writeSelectedLevel,
+  writeWeights,
 } from "@/lib/storage";
 import { getChecklist, getPlanItemIds, getRequiredItems } from "@/data/workouts";
-import type { CompletionDayId, DayId, WorkoutCompletion, WorkoutDay, WorkoutPlan } from "@/types/workout";
+import type {
+  CompletionDayId,
+  DayId,
+  LevelId,
+  WeightEntry,
+  WorkoutCompletion,
+  WorkoutDay,
+  WorkoutPlan,
+} from "@/types/workout";
+
+export type LoggedWeight = Pick<WeightEntry, "kg" | "updatedAt">;
 
 type Snapshot = {
   selectedDay: DayId;
+  selectedLevel: LevelId;
   /** exerciseId → completedAt */
   completions: ReadonlyMap<string, number>;
+  /** exerciseId → last logged weight */
+  weights: ReadonlyMap<string, LoggedWeight>;
 };
 
 /** Safety-net re-check while the app is open, independent of the expiry timer. */
@@ -38,17 +58,30 @@ let expiryTimer: ReturnType<typeof setTimeout> | undefined;
 let pollTimer: ReturnType<typeof setInterval> | undefined;
 
 function load(): void {
-  stored = readCompletions(Date.now());
+  const now = Date.now();
+  stored = readCompletions(now);
+  const weights = readWeights(now);
   const selectedDay = readSelectedDay();
-  const key = `${selectedDay}|${stored
-    .map((c) => `${c.exerciseId}:${c.completedAt}`)
-    .sort()
-    .join(",")}`;
+  const selectedLevel = readSelectedLevel();
+  const key = [
+    selectedDay,
+    selectedLevel,
+    stored
+      .map((c) => `${c.exerciseId}:${c.completedAt}`)
+      .sort()
+      .join(","),
+    weights
+      .map((w) => `${w.exerciseId}:${w.kg}:${w.updatedAt}`)
+      .sort()
+      .join(","),
+  ].join("|");
   if (key !== snapshotKey || !snapshot) {
     snapshotKey = key;
     snapshot = {
       selectedDay,
+      selectedLevel,
       completions: new Map(stored.map((c) => [c.exerciseId, c.completedAt])),
+      weights: new Map(weights.map((w) => [w.exerciseId, { kg: w.kg, updatedAt: w.updatedAt }])),
     };
   }
 }
@@ -73,8 +106,10 @@ function onVisibilityChange(): void {
   if (document.visibilityState === "visible") refresh();
 }
 
+const WATCHED_KEYS = new Set([STORAGE_KEY, SELECTED_DAY_KEY, SELECTED_LEVEL_KEY, WEIGHTS_KEY]);
+
 function onStorage(event: StorageEvent): void {
-  if (event.key === null || event.key === STORAGE_KEY || event.key === SELECTED_DAY_KEY) refresh();
+  if (event.key === null || WATCHED_KEYS.has(event.key)) refresh();
 }
 
 function subscribe(listener: () => void): () => void {
@@ -136,6 +171,25 @@ export function useWorkoutProgress() {
     writeSelectedDay(dayId);
     refresh();
   }, []);
+
+  const selectLevel = useCallback((levelId: LevelId) => {
+    writeSelectedLevel(levelId);
+    refresh();
+  }, []);
+
+  /** Saves the weight for an exercise, or removes it when `kg` is `null`. */
+  const setWeight = useCallback((exerciseId: string, kg: number | null) => {
+    const now = Date.now();
+    const next = readWeights(now).filter((w) => w.exerciseId !== exerciseId);
+    if (kg !== null && isValidWeight(kg)) next.push({ exerciseId, kg, updatedAt: now });
+    writeWeights(next);
+    refresh();
+  }, []);
+
+  const weightFor = useCallback(
+    (exerciseId: string): LoggedWeight | null => state?.weights.get(exerciseId) ?? null,
+    [state],
+  );
 
   const setCompleted = useCallback((exerciseId: string, dayId: CompletionDayId, completed: boolean) => {
     const now = Date.now();
@@ -208,6 +262,10 @@ export function useWorkoutProgress() {
     hydrated: state !== null,
     selectedDay: state?.selectedDay ?? null,
     selectDay,
+    selectedLevel: state?.selectedLevel ?? null,
+    selectLevel,
+    weightFor,
+    setWeight,
     isCompleted,
     setCompleted,
     resetDay,

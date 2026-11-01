@@ -3,20 +3,21 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { PlanView, PlanViewFallback } from "@/components/PlanView";
-import { getPlan, isPlanId, WORKOUT_PLANS } from "@/data/workouts";
+import { getLevel, getPlan, isPlanId, WORKOUT_PLANS } from "@/data/workouts";
 
 export function generateStaticParams() {
-  return WORKOUT_PLANS.map((plan) => ({ planId: String(plan.id) }));
+  return WORKOUT_PLANS.map((plan) => ({ planId: plan.id }));
 }
 
 function parsePlanId(value: string) {
-  const planId = Number(value);
-  return isPlanId(planId) ? planId : null;
+  return isPlanId(value) ? value : null;
 }
 
 export async function generateMetadata({ params }: PageProps<"/plan/[planId]">): Promise<Metadata> {
   const planId = parsePlanId((await params).planId);
-  return { title: planId ? `${getPlan(planId).name} — SAAD GYM` : "SAAD GYM" };
+  if (!planId) return { title: "SAAD GYM" };
+  const plan = getPlan(planId);
+  return { title: `${getLevel(plan.level).name} · ${plan.name} — SAAD GYM` };
 }
 
 // Reading `params` happens inside <Suspense> so navigations can show the

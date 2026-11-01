@@ -1,8 +1,20 @@
-import { DEFAULT_DAY_ID, EXPIRING_ITEM_IDS, isDayId, ITEM_DAY_INDEX } from "@/data/workouts";
-import type { DayId, WorkoutCompletion } from "@/types/workout";
+import {
+  DEFAULT_DAY_ID,
+  DEFAULT_LEVEL_ID,
+  EXPIRING_ITEM_IDS,
+  isDayId,
+  isLevelId,
+  ITEM_DAY_INDEX,
+  WEIGHT_ITEM_IDS,
+} from "@/data/workouts";
+import type { DayId, LevelId, WeightEntry, WorkoutCompletion } from "@/types/workout";
 
 export const STORAGE_KEY = "saad-gym-workout-v1";
 export const SELECTED_DAY_KEY = "saad-gym-selected-day-v1";
+export const SELECTED_LEVEL_KEY = "saad-gym-selected-level-v1";
+export const WEIGHTS_KEY = "saad-gym-weights-v1";
+/** Upper bound for a logged weight; anything above is treated as a typo. */
+export const MAX_WEIGHT_KG = 999;
 /** How long a warm-up tick lasts. Exercise ticks last until the cycle is reset. */
 export const EXPIRY_TIME = 4 * 60 * 60 * 1000;
 
@@ -106,16 +118,23 @@ export function writeCompletions(completions: WorkoutCompletion[]): void {
   }
 }
 
-function readPreference<T>(key: string, isValid: (value: unknown) => value is T, fallback: T): T {
+function readPreference<T>(
+  key: string,
+  parse: (raw: string) => unknown,
+  isValid: (value: unknown) => value is T,
+  fallback: T,
+): T {
   try {
-    const value = Number(getStorage()?.getItem(key));
+    const raw = getStorage()?.getItem(key);
+    if (raw == null) return fallback;
+    const value = parse(raw);
     return isValid(value) ? value : fallback;
   } catch {
     return fallback;
   }
 }
 
-function writePreference(key: string, value: number): void {
+function writePreference(key: string, value: string | number): void {
   try {
     getStorage()?.setItem(key, String(value));
   } catch {
@@ -123,8 +142,94 @@ function writePreference(key: string, value: number): void {
   }
 }
 
-export const readSelectedDay = (): DayId => readPreference(SELECTED_DAY_KEY, isDayId, DEFAULT_DAY_ID);
+export const readSelectedDay = (): DayId =>
+  readPreference(SELECTED_DAY_KEY, Number, isDayId, DEFAULT_DAY_ID);
 export const writeSelectedDay = (dayId: DayId) => writePreference(SELECTED_DAY_KEY, dayId);
+
+export const readSelectedLevel = (): LevelId =>
+  readPreference(SELECTED_LEVEL_KEY, String, isLevelId, DEFAULT_LEVEL_ID);
+export const writeSelectedLevel = (levelId: LevelId) => writePreference(SELECTED_LEVEL_KEY, levelId);
+
+type StoredWeights = { weights: WeightEntry[] };
+
+export function isValidWeight(kg: unknown): kg is number {
+  return typeof kg === "number" && Number.isFinite(kg) && kg > 0 && kg <= MAX_WEIGHT_KG;
+}
+
+function isValidWeightEntry(value: unknown, now: number): value is WeightEntry {
+  if (typeof value !== "object" || value === null) return false;
+  const { exerciseId, kg, updatedAt } = value as Record<string, unknown>;
+  return (
+    typeof exerciseId === "string" &&
+    WEIGHT_ITEM_IDS.has(exerciseId) &&
+    isValidWeight(kg) &&
+    typeof updatedAt === "number" &&
+    Number.isFinite(updatedAt) &&
+    updatedAt <= now + MAX_CLOCK_SKEW
+  );
+}
+
+/**
+ * Reads logged weights, discarding anything invalid, unknown or duplicated, and
+ * writes the cleaned list back if anything was dropped. Weights are never
+ * cleared by day/cycle resets, so the lifter sees them next session.
+ */
+export function readWeights(now: number = Date.now()): WeightEntry[] {
+  const storage = getStorage();
+  if (!storage) return [];
+
+  let raw: string | null;
+  try {
+    raw = storage.getItem(WEIGHTS_KEY);
+  } catch {
+    return [];
+  }
+  if (raw === null) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    writeWeights([]);
+    return [];
+  }
+
+  const entries =
+    typeof parsed === "object" && parsed !== null && Array.isArray((parsed as StoredWeights).weights)
+      ? (parsed as StoredWeights).weights
+      : null;
+  if (!entries) {
+    writeWeights([]);
+    return [];
+  }
+
+  const byId = new Map<string, WeightEntry>();
+  for (const entry of entries as unknown[]) {
+    if (!isValidWeightEntry(entry, now)) continue;
+    const { exerciseId, kg, updatedAt } = entry;
+    const existing = byId.get(exerciseId);
+    if (!existing || existing.updatedAt < updatedAt) byId.set(exerciseId, { exerciseId, kg, updatedAt });
+  }
+
+  const cleaned = [...byId.values()];
+  if (cleaned.length !== entries.length) writeWeights(cleaned);
+  return cleaned;
+}
+
+export function writeWeights(weights: WeightEntry[]): void {
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    if (weights.length === 0) {
+      storage.removeItem(WEIGHTS_KEY);
+    } else {
+      const state: StoredWeights = { weights };
+      storage.setItem(WEIGHTS_KEY, JSON.stringify(state));
+    }
+  } catch {
+    // Quota exceeded or storage disabled — the UI still works for this session.
+  }
+}
 
 /** Timestamp at which the earliest expiring completion expires, or `null`. */
 export function getNextExpiry(completions: WorkoutCompletion[]): number | null {

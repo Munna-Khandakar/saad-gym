@@ -1,20 +1,20 @@
 export type DayId = 1 | 2 | 3 | 4 | 5 | 6;
-export type PlanId = 1 | 2;
+export type LevelId = "beginner" | "intermediate" | "advanced";
+/** URL slug of a plan, e.g. "beginner-1". */
+export type PlanId = `${LevelId}-${number}`;
 /** A workout day, or 0 for the general warm-up. */
 export type CompletionDayId = DayId | 0;
 
 export type Exercise = {
-  /** Stable, unique identifier — used as the localStorage completion key. */
+  /** Stable, unique identifier — used as the localStorage key for ticks and weights. */
   id: string;
   name: string;
-  /** `null` when the routine does not specify sets (rendered as "—"). */
-  sets: number | null;
-  /** `null` when the routine does not specify reps (rendered as "—"). */
-  reps: string | null;
   /** Optional extras are shown but never required to finish a day. */
   optional?: boolean;
-  /** Short hint shown instead of sets/reps, for items that have none. */
+  /** Short hint shown under the name, for items such as the rest day. */
   detail?: string;
+  /** How long the item takes, e.g. "10 min" for the warm-up. */
+  duration?: string;
 };
 
 export type WorkoutDay = {
@@ -27,8 +27,16 @@ export type WorkoutDay = {
   isRecovery?: boolean;
 };
 
+export type ExperienceLevel = {
+  id: LevelId;
+  name: string;
+};
+
 export type WorkoutPlan = {
   id: PlanId;
+  level: LevelId;
+  /** Position within its level, shown on the plan card. */
+  number: number;
   name: string;
   days: readonly WorkoutDay[];
 };
@@ -40,4 +48,11 @@ export type WorkoutCompletion = {
   exerciseId: string;
   dayId: CompletionDayId;
   completedAt: number;
+};
+
+/** The last weight logged for an exercise. Kept across cycles. */
+export type WeightEntry = {
+  exerciseId: string;
+  kg: number;
+  updatedAt: number;
 };

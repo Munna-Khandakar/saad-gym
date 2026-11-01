@@ -38,6 +38,8 @@
   --animate-check-pop: check-pop 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
   --animate-rise-in: rise-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-confetti: confetti 1200ms cubic-bezier(0.15, 0.75, 0.3, 1) forwards;
+  /* Duration is set inline from HOLD_DURATION in useLongPress. */
+  --animate-hold-fill: hold-fill linear forwards;
 
   @keyframes check-pop {
     0% {
@@ -58,6 +60,15 @@
     to {
       opacity: 1;
       transform: none;
+    }
+  }
+
+  @keyframes hold-fill {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
     }
   }
 

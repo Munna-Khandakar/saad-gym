@@ -32,10 +32,10 @@ Before calling a change done, run `lint`, `tsc` and `build`, and make sure all t
 
 | Route | Component | Content |
 | --- | --- | --- |
-| `/` | `HomeView` | Header, welcome line, 10-min warm-up checkbox (step 1), plan cards (step 2) |
-| `/plan/[planId]` | `PlanView` | Cycle tracker, day tabs, day progress, exercise checklist |
+| `/` | `HomeView` | Header, welcome line, 10-min warm-up checkbox (step 1), experience level picker (step 2), plan cards for that level (step 3) |
+| `/plan/[planId]` | `PlanView` | Cycle tracker, day tabs, day progress, exercise checklist with weight logging |
 
-`generateStaticParams` prerenders `/plan/1` and `/plan/2`. Any other id renders `notFound()`.
+Plan ids are slugs, `<level>-<n>` (e.g. `beginner-1`). `generateStaticParams` prerenders every plan in `WORKOUT_PLANS`, and any other id renders `notFound()`. `next.config.ts` redirects the old `/plan/1` and `/plan/2` URLs.
 
 ## Code map
 
@@ -44,27 +44,33 @@ src/
 ├── app/                    layout (dark theme, footer), home page, plan/[planId] page, globals.css
 ├── components/             feature components (one per file, PascalCase); ui/ = shadcn primitives
 ├── data/workouts.ts        routine data + lookup helpers (getPlan, getDay, getChecklist, getRequiredItems, ...)
-├── hooks/useWorkoutProgress.ts   the single store/hook for all progress state
+├── hooks/useWorkoutProgress.ts   the single store/hook for all progress, level and weight state
+├── hooks/useLongPress.ts   press-and-hold gesture (opens the weight editor)
 ├── lib/storage.ts          localStorage read/validate/prune/write
-├── lib/format.ts           date formatting
-└── types/workout.ts        DayId, PlanId, Exercise, WorkoutDay, WorkoutPlan, WorkoutCompletion
+├── lib/format.ts           date and kg formatting
+└── types/workout.ts        DayId, LevelId, PlanId, Exercise, WorkoutDay, WorkoutPlan, WorkoutCompletion, WeightEntry
 ```
 
 ## Domain rules
 
-- **Workout data is user-provided and must be entered exactly as given.** Don't rename exercises, reorder them, or invent sets or reps. Missing values are `null` and render as "—".
-- **Exercise ids** are stable slugs with a day prefix, e.g. `d1-flat-bench-press`, and are used as storage keys. Renaming one silently drops saved progress.
-  - Plan 2 is empty for now ("Coming soon"). When its data arrives, use a `p2-` prefix.
+- **Workout data is user-provided and must be entered exactly as given.** Don't rename exercises or reorder them. Sets and reps were removed at the user's request and are not shown; don't add them back unless asked.
+- **Levels and plans:** `EXPERIENCE_LEVELS` holds Beginner, Intermediate and Advanced (Pro). Each plan in `WORKOUT_PLANS` has a `level` and a `number`. A plan with `days: []` renders as "Coming soon". Only Beginner Plan 1 has data for now.
+- **Exercise ids** are stable slugs, used as storage keys for ticks and weights. Renaming one silently drops saved progress.
+  - Beginner Plan 1 keeps its original `d1-…` ids. Give every new plan's ids a plan prefix (e.g. `b2-d1-…`, `i1-d1-…`, `a1-d1-…`) so they never collide.
 - **Warm-up:** a single global item (`WARMUP_ITEM`, `dayId` 0) on the home page. It is the only item that expires, 4 hours after it is ticked (`EXPIRING_ITEM_IDS`).
 - **Cycle:** exercise ticks persist until the user resets them. A day is done when all of its *required* items are ticked, and a cycle is complete when all 6 days are done, in any order.
   - Finishing the last day opens a celebration dialog. "Start new cycle" clears every plan item, keeps the warm-up, and returns to Day 1.
   - "Reset cycle" and "Reset Day N" both ask for confirmation.
 - **Day 4 (recovery):** "Rest day done" is the only required item. Walking, Cycling and Battle Rope are `optional: true` and don't count towards progress.
+- **Weights:** every exercise on a non-recovery day (`WEIGHT_ITEM_IDS`) can hold one weight in kg, the last one logged. It is edited by holding the row for 2 s (`HOLD_DURATION`) or tapping its `kg` button. Weights are never cleared by "Reset Day", "Reset cycle" or "Start new cycle".
 
 ## State and storage
 
-- Keys: `saad-gym-workout-v1` holds `{ completions: [{ exerciseId, dayId, completedAt }] }`, and `saad-gym-selected-day-v1` holds the selected day. Changing a stored shape needs a new key version or a migration.
-- Only completions are stored. Progress, "day done" and "cycle complete" are always derived and never persisted.
+- Keys. Changing a stored shape needs a new key version or a migration.
+  - `saad-gym-workout-v1` holds `{ completions: [{ exerciseId, dayId, completedAt }] }`.
+  - `saad-gym-weights-v1` holds `{ weights: [{ exerciseId, kg, updatedAt }] }`. `readWeights` validates it the same way (`0 < kg ≤ 999`).
+  - `saad-gym-selected-day-v1` holds the selected day, and `saad-gym-selected-level-v1` holds the selected level.
+- Only completions and weights are stored. Progress, "day done" and "cycle complete" are always derived and never persisted.
 - `readCompletions` validates every entry: the id must be known, the `dayId` must match `ITEM_DAY_INDEX`, the timestamp must be finite and not in the future, and the entry must not be expired. It dedupes, then writes the cleaned list back. Corrupt data is cleared, not thrown.
 - `useWorkoutProgress` is a module-level store read through `useSyncExternalStore`:
   - The server snapshot is `null`, so components render a skeleton until hydration. Keep it that way to avoid hydration mismatches.

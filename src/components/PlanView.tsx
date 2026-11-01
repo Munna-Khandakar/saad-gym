@@ -7,7 +7,7 @@ import { CycleTracker } from "@/components/CycleTracker";
 import { DaySelector, dayTabId } from "@/components/DaySelector";
 import { ProgressTracker } from "@/components/ProgressTracker";
 import { WorkoutCard } from "@/components/WorkoutCard";
-import { getChecklist, getDay, getPlan } from "@/data/workouts";
+import { getChecklist, getDay, getLevel, getPlan } from "@/data/workouts";
 import { useWorkoutProgress } from "@/hooks/useWorkoutProgress";
 import type { PlanId, WorkoutPlan } from "@/types/workout";
 
@@ -26,6 +26,7 @@ function PlanHeader({ plan }: { plan: WorkoutPlan | null }) {
       <div className="min-w-0">
         <p className="text-[11px] font-bold tracking-widest text-muted-foreground uppercase">
           SAAD <span className="text-primary">GYM</span>
+          {plan && <> · {getLevel(plan.level).name}</>}
         </p>
         {plan ? (
           <h1 className="text-2xl leading-tight font-black tracking-tight">{plan.name}</h1>
@@ -62,7 +63,9 @@ function EmptyPlan({ plan }: { plan: WorkoutPlan }) {
       <div className="grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
         <Hourglass className="size-6" aria-hidden />
       </div>
-      <p className="mt-4 text-lg font-bold">{plan.name} is coming soon</p>
+      <p className="mt-4 text-lg font-bold">
+        {getLevel(plan.level).name} {plan.name} is coming soon
+      </p>
       <p className="mt-1 max-w-xs text-sm text-muted-foreground">
         Exercises for this plan haven&apos;t been added yet.
       </p>
@@ -93,6 +96,8 @@ export function PlanView({ planId }: { planId: PlanId }) {
     resetCycle,
     progressFor,
     cycleFor,
+    weightFor,
+    setWeight,
   } = useWorkoutProgress();
 
   const plan = getPlan(planId);
@@ -134,6 +139,8 @@ export function PlanView({ planId }: { planId: PlanId }) {
               labelledBy={dayTabId(day.id)}
               isCompleted={isCompleted}
               onToggle={setCompleted}
+              weightFor={weightFor}
+              onSaveWeight={setWeight}
               onReset={() => resetDay(day)}
               hasProgress={getChecklist(day).some((item) => isCompleted(item.id))}
             />

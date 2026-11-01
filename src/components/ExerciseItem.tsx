@@ -1,10 +1,13 @@
 "use client";
 
-import { Flame } from "lucide-react";
+import { Dumbbell, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import type { LoggedWeight } from "@/hooks/useWorkoutProgress";
+import { HOLD_DURATION, useLongPress } from "@/hooks/useLongPress";
+import { formatKg } from "@/lib/format";
 import type { ChecklistItem } from "@/types/workout";
 
 type ExerciseItemProps = {
@@ -13,9 +16,16 @@ type ExerciseItemProps = {
   index: number | null;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
+  /** Last logged weight; only meaningful when `onEditWeight` is set. */
+  weight?: LoggedWeight | null;
+  /** Opens the weight editor. Omit for rows that can't hold a weight (warm-up, rest day). */
+  onEditWeight?: () => void;
 };
 
-const EMPTY = "—";
+/** DOM id of a row's weight button, so the weight dialog can return focus to it. */
+export function weightButtonId(itemId: string): string {
+  return `weight-${itemId}`;
+}
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -26,17 +36,37 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function ExerciseItem({ item, index, checked, onCheckedChange }: ExerciseItemProps) {
+export function ExerciseItem({
+  item,
+  index,
+  checked,
+  onCheckedChange,
+  weight = null,
+  onEditWeight,
+}: ExerciseItemProps) {
   const checkboxId = `item-${item.id}`;
   const isWarmup = item.kind === "warmup";
+  const { holding, handlers } = useLongPress(onEditWeight);
+
+  const meta = isWarmup ? (
+    item.duration && <Stat label="Duration" value={item.duration} />
+  ) : item.detail ? (
+    <span className="text-sm text-muted-foreground">{item.detail}</span>
+  ) : item.optional ? (
+    <Badge variant="outline" className="border-primary/30 text-primary">
+      Optional
+    </Badge>
+  ) : null;
 
   return (
-    <li>
+    <li className="relative">
       <label
         htmlFor={checkboxId}
+        {...handlers}
         className={cn(
-          "group flex min-h-16 cursor-pointer items-center gap-4 rounded-2xl border px-4 py-3.5 transition-all duration-200 select-none active:scale-[0.99]",
+          "group relative flex min-h-16 cursor-pointer items-center gap-4 overflow-hidden rounded-2xl border px-4 py-3.5 transition-all duration-200 select-none [-webkit-touch-callout:none] active:scale-[0.99]",
           "has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50",
+          onEditWeight && "pr-[6.5rem]",
           checked
             ? "border-primary/30 bg-primary/[0.06]"
             : "border-border bg-card hover:border-white/20 hover:bg-[#1c1c20]",
@@ -81,24 +111,51 @@ export function ExerciseItem({ item, index, checked, onCheckedChange }: Exercise
             </span>
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {isWarmup ? (
-              <Stat label="Duration" value={item.reps ?? EMPTY} />
-            ) : item.detail ? (
-              <span className="text-sm text-muted-foreground">{item.detail}</span>
-            ) : item.optional ? (
-              <Badge variant="outline" className="border-primary/30 text-primary">
-                Optional
-              </Badge>
-            ) : (
-              <>
-                <Stat label="Sets" value={item.sets === null ? EMPTY : String(item.sets)} />
-                <Stat label="Reps" value={item.reps ?? EMPTY} />
-              </>
-            )}
-          </div>
+          {meta && <div className="mt-2 flex flex-wrap items-center gap-1.5">{meta}</div>}
         </div>
+
+        {holding && (
+          // Fills across the row while held; reduced motion collapses it to an instant bar.
+          <span
+            aria-hidden
+            className="absolute inset-x-0 bottom-0 h-1 origin-left animate-hold-fill bg-primary"
+            style={{ animationDuration: `${HOLD_DURATION}ms` }}
+          />
+        )}
       </label>
+
+      {onEditWeight && (
+        // A sibling of the label, not a child, so tapping it never toggles the checkbox.
+        <button
+          type="button"
+          id={weightButtonId(item.id)}
+          onClick={onEditWeight}
+          aria-label={
+            weight
+              ? `${item.name}: ${formatKg(weight.kg)} kg, edit weight`
+              : `Log weight for ${item.name}`
+          }
+          className={cn(
+            "absolute top-1/2 right-3 flex h-11 min-w-11 -translate-y-1/2 items-center justify-center gap-1 rounded-xl border px-2.5 text-sm font-bold tabular-nums outline-none transition-colors",
+            "focus-visible:ring-[3px] focus-visible:ring-ring/60 active:scale-95",
+            weight
+              ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"
+              : "border-white/10 bg-white/[0.04] text-muted-foreground hover:border-primary/50 hover:text-primary",
+          )}
+        >
+          {weight ? (
+            <>
+              {formatKg(weight.kg)}
+              <span className="text-xs font-semibold opacity-80">kg</span>
+            </>
+          ) : (
+            <>
+              <Dumbbell className="size-4" aria-hidden />
+              <span className="text-xs font-semibold">kg</span>
+            </>
+          )}
+        </button>
+      )}
     </li>
   );
 }

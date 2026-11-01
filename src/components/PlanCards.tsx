@@ -30,7 +30,7 @@ export function PlanCards({ plans, cycleFor }: PlanCardsProps) {
               className={`${cardBase} group border-border bg-card outline-none hover:border-primary/60 hover:bg-primary/[0.06] focus-visible:ring-[3px] focus-visible:ring-ring/60 active:scale-[0.98]`}
             >
               <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary text-lg font-black text-primary-foreground">
-                {plan.id}
+                {plan.number}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-lg leading-tight font-black tracking-tight">{plan.name}</span>
@@ -52,7 +52,7 @@ export function PlanCards({ plans, cycleFor }: PlanCardsProps) {
               className={`${cardBase} border-dashed border-white/15 bg-card/50 text-muted-foreground`}
             >
               <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/[0.06] text-lg font-black">
-                {plan.id}
+                {plan.number}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-lg leading-tight font-black tracking-tight text-foreground/70">

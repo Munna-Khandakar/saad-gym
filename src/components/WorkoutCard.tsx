@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { BatteryCharging } from "lucide-react";
 
 import { ConfirmResetButton } from "@/components/ConfirmResetButton";
 import { ExerciseItem } from "@/components/ExerciseItem";
+import { WeightDialog } from "@/components/WeightDialog";
 import { getChecklist } from "@/data/workouts";
+import type { LoggedWeight } from "@/hooks/useWorkoutProgress";
 import type { ChecklistItem, DayId, WorkoutDay } from "@/types/workout";
 
 type WorkoutCardProps = {
@@ -13,6 +16,8 @@ type WorkoutCardProps = {
   labelledBy: string;
   isCompleted: (itemId: string) => boolean;
   onToggle: (itemId: string, dayId: DayId, completed: boolean) => void;
+  weightFor: (itemId: string) => LoggedWeight | null;
+  onSaveWeight: (itemId: string, kg: number | null) => void;
   onReset: () => void;
   hasProgress: boolean;
 };
@@ -23,9 +28,23 @@ export function WorkoutCard({
   labelledBy,
   isCompleted,
   onToggle,
+  weightFor,
+  onSaveWeight,
   onReset,
   hasProgress,
 }: WorkoutCardProps) {
+  const [weightOpen, setWeightOpen] = useState(false);
+  // Kept after closing so the dialog still has content while it animates out.
+  const [editing, setEditing] = useState<{ id: string; name: string; session: number } | null>(
+    null,
+  );
+  const canLogWeight = !day.isRecovery;
+
+  const openWeight = (item: ChecklistItem) => {
+    setEditing((prev) => ({ id: item.id, name: item.name, session: (prev?.session ?? 0) + 1 }));
+    setWeightOpen(true);
+  };
+
   const items = getChecklist(day);
   const required = items.filter((item) => !item.optional);
   const optional = items.filter((item) => item.optional);
@@ -40,6 +59,8 @@ export function WorkoutCard({
           index={day.isRecovery ? null : i + 1}
           checked={isCompleted(item.id)}
           onCheckedChange={(checked) => onToggle(item.id, day.id, checked)}
+          weight={canLogWeight ? weightFor(item.id) : null}
+          onEditWeight={canLogWeight ? () => openWeight(item) : undefined}
         />
       ))}
     </ul>
@@ -52,6 +73,12 @@ export function WorkoutCard({
           Day {day.id} <span className="text-muted-foreground">—</span> {day.title}
         </h3>
         <p className="mt-1 text-sm text-muted-foreground">{day.focus}</p>
+        {canLogWeight && (
+          <p className="mt-2 text-xs text-muted-foreground/80">
+            Hold an exercise or tap <span className="font-semibold text-foreground/80">kg</span> to
+            log the weight you lifted.
+          </p>
+        )}
       </div>
 
       {day.isRecovery && (
@@ -85,6 +112,16 @@ export function WorkoutCard({
           onConfirm={onReset}
         />
       </div>
+
+      {canLogWeight && (
+        <WeightDialog
+          open={weightOpen}
+          onOpenChange={setWeightOpen}
+          exercise={editing}
+          weight={editing ? weightFor(editing.id) : null}
+          onSave={(kg) => editing && onSaveWeight(editing.id, kg)}
+        />
+      )}
     </section>
   );
 }

@@ -29,7 +29,7 @@ export function PlanCards({ plans, cycleFor }: PlanCardsProps) {
               prefetch
               className={`${cardBase} group border-border bg-card outline-none hover:border-primary/60 hover:bg-primary/[0.06] focus-visible:ring-[3px] focus-visible:ring-ring/60 active:scale-[0.98]`}
             >
-              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary text-lg font-black text-primary-foreground">
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary bg-level-gradient text-lg font-black text-primary-foreground">
                 {plan.number}
               </span>
               <span className="min-w-0 flex-1">

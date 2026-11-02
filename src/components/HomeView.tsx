@@ -50,7 +50,8 @@ export function HomeView() {
             </div>
           </div>
         ) : (
-          <>
+          // Steps 2–3 take the chosen level's colour; the brand header and warm-up stay lime.
+          <div data-level={selectedLevel} className="space-y-8">
             <section aria-labelledby="level-heading">
               <StepLabel id="level-heading" step={2}>
                 Choose your level
@@ -64,7 +65,7 @@ export function HomeView() {
               </StepLabel>
               <PlanCards plans={getPlansForLevel(selectedLevel)} cycleFor={cycleFor} />
             </section>
-          </>
+          </div>
         )}
       </div>
     </>

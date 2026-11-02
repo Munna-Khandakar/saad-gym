@@ -97,7 +97,7 @@ export function ProgressTracker({ day, progress }: ProgressTrackerProps) {
       {isComplete && (
         <div
           role="status"
-          className="mt-4 flex animate-rise-in items-center gap-3 rounded-2xl bg-primary px-4 py-3 text-primary-foreground"
+          className="mt-4 flex animate-rise-in items-center gap-3 rounded-2xl bg-primary bg-level-gradient px-4 py-3 text-primary-foreground"
         >
           <Trophy className="size-5 shrink-0" strokeWidth={2.5} aria-hidden />
           <div className="min-w-0">

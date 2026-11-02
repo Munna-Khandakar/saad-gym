@@ -4,6 +4,7 @@ import { useRef, useState, type FormEvent, type RefObject } from "react";
 import { Minus, Plus } from "lucide-react";
 
 import { weightButtonId } from "@/components/ExerciseItem";
+import { useLevel } from "@/components/LevelTheme";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -37,10 +38,12 @@ function parseKg(value: string): number | null {
 
 export function WeightDialog({ open, onOpenChange, exercise, weight, onSave }: WeightDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const level = useLevel();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        data-level={level}
         showCloseButton={false}
         className="rounded-3xl border-border bg-card p-6 sm:max-w-sm"
         onOpenAutoFocus={(event) => {

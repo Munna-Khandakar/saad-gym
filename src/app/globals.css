@@ -107,6 +107,44 @@
   --border: rgb(255 255 255 / 0.08);
   --input: rgb(255 255 255 / 0.14);
   --ring: #a3e635;
+  /* Level accent extras. Beginner (lime) is the default; see [data-level] below. */
+  --level-soft: #d9f99d;
+  --level-deep: #65a30d;
+  --level-gradient: linear-gradient(90deg, #84cc16, #a3e635, #bef264);
+}
+
+/*
+ * Each experience level re-themes everything inside a [data-level] element by
+ * overriding the accent tokens, so components keep using `primary` and never
+ * hard-code level colours. Intensity rises with the level: lime → yellow-red → light red.
+ * Beginner is spelled out too, so it wins when nested inside another level.
+ */
+[data-level="beginner"] {
+  --primary: #a3e635;
+  --ring: #a3e635;
+  --level-soft: #d9f99d;
+  --level-deep: #65a30d;
+  --level-gradient: linear-gradient(90deg, #84cc16, #a3e635, #bef264);
+}
+
+[data-level="intermediate"] {
+  --primary: #fb923c;
+  --ring: #fb923c;
+  --level-soft: #fde047;
+  --level-deep: #ef4444;
+  --level-gradient: linear-gradient(90deg, #facc15, #fb923c, #ef4444);
+}
+
+[data-level="advanced"] {
+  --primary: #f87171;
+  --ring: #f87171;
+  --level-soft: #fecaca;
+  --level-deep: #dc2626;
+  --level-gradient: linear-gradient(90deg, #fca5a5, #f87171, #ef4444);
+}
+
+@utility bg-level-gradient {
+  background-image: var(--level-gradient);
 }
 
 @layer base {

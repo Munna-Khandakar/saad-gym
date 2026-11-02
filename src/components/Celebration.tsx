@@ -1,7 +1,8 @@
 import type { CSSProperties } from "react";
 
 const PIECES = 18;
-const COLORS = ["#a3e635", "#d9f99d", "#fafafa", "#65a30d"];
+// Level tokens, so the burst matches the level it celebrates (see globals.css).
+const COLORS = ["var(--primary)", "var(--level-soft)", "#fafafa", "var(--level-deep)"];
 
 /** Deterministic burst pattern (no randomness, so renders stay pure). */
 const pieces = Array.from({ length: PIECES }, (_, i) => {

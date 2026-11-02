@@ -35,14 +35,19 @@ export function LevelPicker({ labelledBy, selected, onSelect }: LevelPickerProps
         return (
           <label
             key={level.id}
+            // Each card wears its own level colour, so the whole ladder is visible at once.
+            data-level={level.id}
             className={cn(
-              "flex min-h-[104px] cursor-pointer flex-col justify-between gap-2 rounded-2xl border p-3 transition-all duration-200 select-none active:scale-[0.98]",
+              "relative flex min-h-[104px] cursor-pointer flex-col justify-between gap-2 overflow-hidden rounded-2xl border p-3 transition-all duration-200 select-none active:scale-[0.98]",
               "has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/60",
               checked
-                ? "border-primary bg-primary/[0.08]"
-                : "border-border bg-card hover:border-white/20 hover:bg-[#1c1c20]",
+                ? "border-primary bg-primary/[0.08] shadow-[0_0_24px_-8px] shadow-primary/50"
+                : "border-border bg-card hover:border-primary/40 hover:bg-[#1c1c20]",
             )}
           >
+            {checked && (
+              <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-primary bg-level-gradient" />
+            )}
             <input
               type="radio"
               name="experience-level"
@@ -51,10 +56,7 @@ export function LevelPicker({ labelledBy, selected, onSelect }: LevelPickerProps
               onChange={() => onSelect(level.id)}
               className="sr-only"
             />
-            <Icon
-              className={cn("size-5", checked ? "text-primary" : "text-muted-foreground")}
-              aria-hidden
-            />
+            <Icon className={cn("size-5 text-primary", !checked && "opacity-70")} aria-hidden />
             <span>
               <span className="block text-[15px] leading-tight font-black tracking-tight text-balance">
                 {level.name}
@@ -62,7 +64,7 @@ export function LevelPicker({ labelledBy, selected, onSelect }: LevelPickerProps
               <span
                 className={cn(
                   "mt-0.5 block text-xs",
-                  status === "Coming soon" ? "text-muted-foreground" : "text-primary",
+                  status === "Coming soon" ? "text-primary/70" : "text-primary",
                 )}
               >
                 {status}

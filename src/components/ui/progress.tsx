@@ -20,8 +20,9 @@ function Progress({
     >
       <ProgressPrimitive.Indicator
         data-slot="progress-indicator"
-        className="h-full w-full flex-1 bg-primary transition-all"
-        style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
+        className="h-full rounded-full bg-primary bg-level-gradient transition-all"
+        // Width, not a translated full bar, so the level gradient is never cropped to one end.
+        style={{ width: `${value || 0}%` }}
       />
     </ProgressPrimitive.Root>
   )

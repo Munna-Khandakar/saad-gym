@@ -118,7 +118,7 @@ export function ExerciseItem({
           // Fills across the row while held; reduced motion collapses it to an instant bar.
           <span
             aria-hidden
-            className="absolute inset-x-0 bottom-0 h-1 origin-left animate-hold-fill bg-primary"
+            className="absolute inset-x-0 bottom-0 h-1 origin-left animate-hold-fill bg-primary bg-level-gradient"
             style={{ animationDuration: `${HOLD_DURATION}ms` }}
           />
         )}

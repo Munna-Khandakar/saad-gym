@@ -9,6 +9,7 @@ A mobile-first personal workout tracker. Warm up, pick your plan, and work throu
 - **Home page (`/`):** the intro, then **1. Warm-up** (10 min, checkable), then **2. Choose your level** (Beginner, Intermediate or Advanced (Pro)), then **3. Choose your plan** for that level. The chosen level is remembered.
 - **Plan page (`/plan/beginner-1`):** day tabs, progress and the exercise checklist, with a back button to return home. Old `/plan/1` links redirect here.
 - **Beginner Plan 1:** six workout days (Push, Pull, Legs, Rest / Cardio, Upper Body, Legs & Arms). Every other plan (Beginner Plan 2, Intermediate Plans 1–2, Advanced Plans 1–2) is coming soon. Add its days in `src/data/workouts.ts` and its card becomes a link automatically.
+- **Level colours:** Beginner is lime, Intermediate is a yellow-to-red blend and Advanced (Pro) is light red. The colour follows you onto that level's plan pages, so stepping up a level feels like it.
 - **Weight log:** hold an exercise for 2 seconds, or tap its **kg** button, to save the weight you lifted (in kg). The row then shows it, so you can match or beat it next session. Weights are kept when you reset a day or start a new cycle. Rest-day items have no weight.
 - **Cycle tracking:** ticks are kept until the cycle ends. Each day tab shows "Done · date", "x/y done" or "Not started", and a cycle bar shows "N of 6 days done".
 - **Cycle complete:** finishing the last remaining day opens a celebration with **Start new cycle**, which clears the cycle. Choosing "Not now" keeps the data until you tap it.

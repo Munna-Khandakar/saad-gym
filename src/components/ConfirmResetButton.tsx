@@ -3,6 +3,8 @@
 import { RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { useLevel } from "@/components/LevelTheme";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +38,7 @@ export function ConfirmResetButton({
   size = "default",
   onConfirm,
 }: ConfirmResetButtonProps) {
+  const level = useLevel();
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
@@ -51,7 +54,7 @@ export function ConfirmResetButton({
           {label}
         </Button>
       </AlertDialogTrigger>
-      <AlertDialogContent className="rounded-3xl border-border bg-card">
+      <AlertDialogContent data-level={level} className="rounded-3xl border-border bg-card">
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>

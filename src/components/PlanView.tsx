@@ -5,6 +5,7 @@ import { ArrowLeft, Hourglass } from "lucide-react";
 
 import { CycleTracker } from "@/components/CycleTracker";
 import { DaySelector, dayTabId } from "@/components/DaySelector";
+import { LevelProvider } from "@/components/LevelTheme";
 import { ProgressTracker } from "@/components/ProgressTracker";
 import { WorkoutCard } from "@/components/WorkoutCard";
 import { getChecklist, getDay, getLevel, getPlan } from "@/data/workouts";
@@ -105,48 +106,51 @@ export function PlanView({ planId }: { planId: PlanId }) {
   const progress = day ? progressFor(day) : null;
 
   return (
-    <>
-      <PlanHeader plan={plan} />
+    // The level's accent colours apply to everything in this plan (see globals.css).
+    <LevelProvider value={plan.level}>
+      <div data-level={plan.level}>
+        <PlanHeader plan={plan} />
 
-      <div className="mt-8">
-        {plan.days.length === 0 ? (
-          <EmptyPlan plan={plan} />
-        ) : !hydrated || !day || !progress ? (
-          <LoadingSkeleton />
-        ) : (
-          <div className="space-y-6">
-            <CycleTracker
-              plan={plan}
-              cycle={cycleFor(plan)}
-              progressFor={progressFor}
-              onStartNewCycle={() => {
-                resetCycle(plan);
-                selectDay(plan.days[0].id);
-              }}
-            />
-            <DaySelector
-              days={plan.days}
-              selectedDay={day.id}
-              onSelect={selectDay}
-              progressFor={progressFor}
-              panelId={DAY_PANEL_ID}
-            />
-            <ProgressTracker day={day} progress={progress} />
-            <WorkoutCard
-              key={day.id}
-              day={day}
-              id={DAY_PANEL_ID}
-              labelledBy={dayTabId(day.id)}
-              isCompleted={isCompleted}
-              onToggle={setCompleted}
-              weightFor={weightFor}
-              onSaveWeight={setWeight}
-              onReset={() => resetDay(day)}
-              hasProgress={getChecklist(day).some((item) => isCompleted(item.id))}
-            />
-          </div>
-        )}
+        <div className="mt-8">
+          {plan.days.length === 0 ? (
+            <EmptyPlan plan={plan} />
+          ) : !hydrated || !day || !progress ? (
+            <LoadingSkeleton />
+          ) : (
+            <div className="space-y-6">
+              <CycleTracker
+                plan={plan}
+                cycle={cycleFor(plan)}
+                progressFor={progressFor}
+                onStartNewCycle={() => {
+                  resetCycle(plan);
+                  selectDay(plan.days[0].id);
+                }}
+              />
+              <DaySelector
+                days={plan.days}
+                selectedDay={day.id}
+                onSelect={selectDay}
+                progressFor={progressFor}
+                panelId={DAY_PANEL_ID}
+              />
+              <ProgressTracker day={day} progress={progress} />
+              <WorkoutCard
+                key={day.id}
+                day={day}
+                id={DAY_PANEL_ID}
+                labelledBy={dayTabId(day.id)}
+                isCompleted={isCompleted}
+                onToggle={setCompleted}
+                weightFor={weightFor}
+                onSaveWeight={setWeight}
+                onReset={() => resetDay(day)}
+                hasProgress={getChecklist(day).some((item) => isCompleted(item.id))}
+              />
+            </div>
+          )}
+        </div>
       </div>
-    </>
+    </LevelProvider>
   );
 }

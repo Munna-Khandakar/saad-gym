@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 import { ConfettiBurst } from "@/components/Celebration";
 import { ConfirmResetButton } from "@/components/ConfirmResetButton";
+import { useLevel } from "@/components/LevelTheme";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,10 +51,14 @@ function CycleCompleteDialog({
   onStartNewCycle: () => void;
 }) {
   const range = dateRange(cycle);
+  const level = useLevel();
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="overflow-hidden rounded-3xl border-primary/40 bg-card">
-        <div className="relative mx-auto grid size-20 place-items-center rounded-3xl bg-primary text-primary-foreground shadow-[0_0_48px_-8px] shadow-primary/70">
+      <AlertDialogContent
+        data-level={level}
+        className="overflow-hidden rounded-3xl border-primary/40 bg-card"
+      >
+        <div className="relative mx-auto grid size-20 place-items-center rounded-3xl bg-primary bg-level-gradient text-primary-foreground shadow-[0_0_48px_-8px] shadow-primary/70">
           <Trophy className="size-10" strokeWidth={2.25} aria-hidden />
           {open && <ConfettiBurst />}
         </div>
@@ -154,7 +159,7 @@ export function CycleTracker({ plan, cycle, progressFor, onStartNewCycle }: Cycl
                   key={day.id}
                   className={cn(
                     "h-2 flex-1 rounded-full transition-colors duration-300",
-                    done ? "bg-primary" : completed > 0 ? "bg-primary/35" : "bg-white/[0.08]",
+                    done ? "bg-primary bg-level-gradient" : completed > 0 ? "bg-primary/35" : "bg-white/[0.08]",
                   )}
                 />
               );

@@ -86,6 +86,9 @@ src/
   - Dark only: background `#09090B`, cards `#18181B`, lime accent `#A3E635` (`primary`).
   - Rounded `2xl`/`3xl` cards and bold tracking-tight headings.
   - Use the theme tokens (`bg-card`, `text-primary`, `text-muted-foreground`, `border-border`) rather than raw colors.
+  - Level colours: a `data-level` attribute re-themes its subtree by overriding `--primary`, `--ring`, `--level-soft`, `--level-deep` and `--level-gradient` (`globals.css`). Beginner is lime, Intermediate is a yellow-to-red blend (`#fb923c` solid), and Advanced is light red (`#f87171`). The home page wraps steps 2–3, and `PlanView` wraps the whole plan; the header and warm-up stay brand lime.
+    - Keep using `primary` tokens, and use `bg-level-gradient` on larger fills. Never hard-code a level hex in a component.
+    - Dialogs portal outside the wrapper, so put `data-level={useLevel()}` (`LevelTheme.tsx`) on their content.
 - Mobile first:
   - Design for 375–390px wide.
   - Tap targets of at least 44px.

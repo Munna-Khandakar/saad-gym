@@ -1,143 +1,62 @@
+import { EXERCISES, MUSCLE_GROUPS, type ExerciseId } from "@/data/exercises";
+import { EXPERIENCE_LEVELS, PLAN_DEFS } from "@/data/plans";
 import type {
   ChecklistItem,
   CompletionDayId,
   DayId,
+  Exercise,
   ExperienceLevel,
   LevelId,
+  PlanDayDef,
+  PlanDef,
   PlanId,
   WorkoutDay,
   WorkoutPlan,
 } from "@/types/workout";
+
+export { EXERCISES, EXPERIENCE_LEVELS };
 
 /** Day id used for the general warm-up, which belongs to no workout day. */
 export const WARMUP_DAY_ID = 0;
 
 /** The single warm-up done before any workout, shown on the home screen. */
 export const WARMUP_ITEM: ChecklistItem = {
+  ...EXERCISES.warmup,
   kind: "warmup",
   id: "warmup",
-  name: "Warm-up",
-  duration: "10 min",
+  exerciseId: "warmup",
 };
 
-const PLAN_1_DAYS: readonly WorkoutDay[] = [
-  {
-    id: 1,
-    title: "Push",
-    focus: "Chest, Shoulders & Triceps",
-    exercises: [
-      { id: "d1-flat-bench-press", name: "Flat Bench Press" },
-      { id: "d1-incline-dumbbell-fly", name: "Incline Dumbbell Fly" },
-      { id: "d1-incline-dumbbell-press", name: "Incline Dumbbell Press" },
-      { id: "d1-cable-side-raise", name: "Cable Side Raise" },
-      { id: "d1-barbell-shoulder-press", name: "Barbell Shoulder Press" },
-      { id: "d1-cable-overhead-triceps-extension", name: "Cable Overhead Triceps Extension" },
-      { id: "d1-triceps-pushdown", name: "Triceps Pushdown" },
-      { id: "d1-close-grip-push-up", name: "Close-Grip Push-Up" },
-    ],
-  },
-  {
-    id: 2,
-    title: "Pull",
-    focus: "Back & Biceps",
-    exercises: [
-      { id: "d2-chin-up", name: "Chin-Up" },
-      { id: "d2-wide-grip-seated-cable-row", name: "Wide-Grip Seated Cable Row" },
-      { id: "d2-one-arm-lat-pulldown", name: "One-Arm Lat Pulldown" },
-      { id: "d2-straight-arm-pulldown", name: "Straight-Arm Pulldown" },
-      { id: "d2-face-pull", name: "Face Pull" },
-      { id: "d2-barbell-curl", name: "Barbell Curl" },
-      { id: "d2-hammer-curl", name: "Hammer Curl" },
-      { id: "d2-reverse-barbell-curl", name: "Reverse Barbell Curl" },
-    ],
-  },
-  {
-    id: 3,
-    title: "Legs",
-    focus: "Lower Body",
-    exercises: [
-      { id: "d3-squat", name: "Squat" },
-      { id: "d3-walking-lunges", name: "Walking Lunges" },
-      { id: "d3-leg-extension", name: "Leg Extension" },
-      { id: "d3-leg-curl-1", name: "Leg Curl" },
-      { id: "d3-hip-thrust", name: "Hip Thrust" },
-      { id: "d3-leg-curl-2", name: "Leg Curl (Second Entry)" },
-      { id: "d3-calf-raise", name: "Calf Raise" },
-    ],
-  },
-  {
-    id: 4,
-    title: "Rest / Cardio",
-    focus: "Active Recovery",
-    isRecovery: true,
-    exercises: [
-      {
-        id: "d4-rest-day-done",
-        name: "Rest day done",
-        detail: "Tick once you've rested or done some light cardio.",
-      },
-      { id: "d4-walking", name: "Walking", optional: true },
-      { id: "d4-cycling", name: "Cycling", optional: true },
-      { id: "d4-battle-rope-workout", name: "Battle Rope Workout", optional: true },
-    ],
-  },
-  {
-    id: 5,
-    title: "Upper Body",
-    focus: "Chest, Back & Shoulders",
-    exercises: [
-      { id: "d5-incline-bench-press", name: "Incline Bench Press" },
-      { id: "d5-cable-crossover", name: "Cable Crossover" },
-      { id: "d5-flat-dumbbell-press", name: "Flat Dumbbell Press" },
-      { id: "d5-lat-pulldown", name: "Lat Pulldown" },
-      { id: "d5-chest-supported-t-bar-row", name: "Chest-Supported T-Bar Row" },
-      { id: "d5-cable-pulldown", name: "Cable Pulldown" },
-      { id: "d5-dumbbell-side-raise", name: "Dumbbell Side Raise" },
-      { id: "d5-barbell-front-raise", name: "Barbell Front Raise" },
-      { id: "d5-bent-over-dumbbell-fly", name: "Bent-Over Dumbbell Fly" },
-      { id: "d5-dumbbell-shrugs", name: "Dumbbell Shrugs" },
-    ],
-  },
-  {
-    id: 6,
-    title: "Legs & Arms",
-    focus: "Legs, Triceps & Biceps",
-    exercises: [
-      { id: "d6-hack-squat", name: "Hack Squat" },
-      { id: "d6-romanian-deadlift", name: "Romanian Deadlift" },
-      { id: "d6-leg-extension", name: "Leg Extension" },
-      { id: "d6-close-grip-bench-press", name: "Close-Grip Bench Press" },
-      { id: "d6-skull-crushers", name: "Skull Crushers" },
-      { id: "d6-single-arm-triceps-pushdown", name: "Single-Arm Triceps Pushdown" },
-      { id: "d6-cable-biceps-curl", name: "Cable Biceps Curl" },
-      { id: "d6-machine-preacher-curl", name: "Machine Preacher Curl" },
-      { id: "d6-wrist-curl", name: "Wrist Curl" },
-    ],
-  },
-];
+/**
+ * Resolves a day's slots against the catalog. Tick keys are derived from the
+ * plan, day and exercise, with "#2", "#3"… for repeats within a day, so they
+ * are unique without anyone writing ids by hand.
+ */
+function resolveDay(planId: PlanId, day: PlanDayDef): WorkoutDay {
+  const seen = new Map<ExerciseId, number>();
+  const exercises = day.exercises.map((slot): Exercise => {
+    const { exercise, name, optional } = typeof slot === "string" ? { exercise: slot } : slot;
+    const count = (seen.get(exercise) ?? 0) + 1;
+    seen.set(exercise, count);
+    const id = `${planId}/${day.id}/${exercise}${count > 1 ? `#${count}` : ""}`;
+    return {
+      ...EXERCISES[exercise],
+      ...(name ? { name } : {}),
+      ...(optional ? { optional } : {}),
+      id,
+      exerciseId: exercise,
+    };
+  });
+  return { ...day, exercises };
+}
 
-export const EXPERIENCE_LEVELS: readonly ExperienceLevel[] = [
-  { id: "beginner", name: "Beginner" },
-  { id: "intermediate", name: "Intermediate" },
-  { id: "advanced", name: "Advanced (Pro)" },
-];
+function resolvePlan(plan: PlanDef): WorkoutPlan {
+  return { ...plan, days: plan.days.map((day) => resolveDay(plan.id, day)) };
+}
+
+export const WORKOUT_PLANS: readonly WorkoutPlan[] = PLAN_DEFS.map(resolvePlan);
 
 export const DEFAULT_LEVEL_ID: LevelId = "beginner";
-
-/*
- * Plans without days show as "Coming soon". Beginner Plan 1 keeps its original
- * "d1-…" exercise ids so existing saved progress survives. Give every new plan's
- * ids a plan prefix (e.g. "b2-d1-…", "i1-d1-…", "a1-d1-…") so they never collide
- * in localStorage.
- */
-export const WORKOUT_PLANS: readonly WorkoutPlan[] = [
-  { id: "beginner-1", level: "beginner", number: 1, name: "Plan 1", days: PLAN_1_DAYS },
-  { id: "beginner-2", level: "beginner", number: 2, name: "Plan 2", days: [] },
-  { id: "intermediate-1", level: "intermediate", number: 1, name: "Plan 1", days: [] },
-  { id: "intermediate-2", level: "intermediate", number: 2, name: "Plan 2", days: [] },
-  { id: "advanced-1", level: "advanced", number: 1, name: "Plan 1", days: [] },
-  { id: "advanced-2", level: "advanced", number: 2, name: "Plan 2", days: [] },
-];
 
 export const DEFAULT_DAY_ID: DayId = 1;
 
@@ -199,9 +118,43 @@ export const ITEM_DAY_INDEX: ReadonlyMap<string, CompletionDayId> = new Map<stri
   ),
 ]);
 
-/** Exercises that can hold a logged weight: everything except the warm-up and recovery days. */
-export const WEIGHT_ITEM_IDS: ReadonlySet<string> = new Set(
+/**
+ * Exercises that can hold a logged weight: anything used on a workout day
+ * (not the warm-up or recovery-only items). Weights are keyed by exercise, so
+ * one entry covers every day and plan the exercise appears in.
+ */
+export const WEIGHT_EXERCISE_IDS: ReadonlySet<ExerciseId> = new Set(
   WORKOUT_PLANS.flatMap((plan) =>
-    plan.days.filter((day) => !day.isRecovery).flatMap((day) => day.exercises.map((e) => e.id)),
+    plan.days.filter((day) => !day.isRecovery).flatMap((day) => day.exercises.map((e) => e.exerciseId)),
   ),
 );
+
+export type WeightGroup = {
+  id: string;
+  name: string;
+  exercises: { id: ExerciseId; name: string }[];
+};
+
+/**
+ * Every weight-eligible exercise, grouped by body part for the "My weights"
+ * page. Groups follow MUSCLE_GROUPS; exercises keep catalog order. Anything
+ * untagged lands in "Other" so it is never hidden.
+ */
+export const WEIGHT_GROUPS: readonly WeightGroup[] = (() => {
+  const exercises = (Object.keys(EXERCISES) as ExerciseId[])
+    .filter((id) => WEIGHT_EXERCISE_IDS.has(id))
+    .map((id) => {
+      const info: { name: string; group?: string } = EXERCISES[id];
+      return { id, name: info.name, group: info.group };
+    });
+  const groups: { id: string; name: string }[] = [...MUSCLE_GROUPS, { id: "other", name: "Other" }];
+  const known = new Set<string>(MUSCLE_GROUPS.map((group) => group.id));
+  return groups
+    .map((group) => ({
+      ...group,
+      exercises: exercises
+        .filter((e) => (e.group && known.has(e.group) ? e.group : "other") === group.id)
+        .map(({ id, name }) => ({ id, name })),
+    }))
+    .filter((group) => group.exercises.length > 0);
+})();

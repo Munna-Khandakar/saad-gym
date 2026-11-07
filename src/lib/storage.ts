@@ -5,14 +5,18 @@ import {
   isDayId,
   isLevelId,
   ITEM_DAY_INDEX,
-  WEIGHT_ITEM_IDS,
+  WEIGHT_EXERCISE_IDS,
 } from "@/data/workouts";
-import type { DayId, LevelId, WeightEntry, WorkoutCompletion } from "@/types/workout";
+import { LEGACY_V1_IDS } from "@/lib/legacyIds";
+import type { DayId, ExerciseId, LevelId, WeightEntry, WorkoutCompletion } from "@/types/workout";
 
-export const STORAGE_KEY = "saad-gym-workout-v1";
+export const STORAGE_KEY = "saad-gym-workout-v2";
 export const SELECTED_DAY_KEY = "saad-gym-selected-day-v1";
 export const SELECTED_LEVEL_KEY = "saad-gym-selected-level-v1";
-export const WEIGHTS_KEY = "saad-gym-weights-v1";
+export const WEIGHTS_KEY = "saad-gym-weights-v2";
+/** v1 keyed ticks and weights by plan-slot id; see `migrateV1`. */
+const LEGACY_STORAGE_KEY = "saad-gym-workout-v1";
+const LEGACY_WEIGHTS_KEY = "saad-gym-weights-v1";
 /** Upper bound for a logged weight; anything above is treated as a typo. */
 export const MAX_WEIGHT_KG = 999;
 /** How long a warm-up tick lasts. Exercise ticks last until the cycle is reset. */
@@ -33,23 +37,23 @@ function getStorage(): Storage | null {
 }
 
 export function isExpired(
-  { exerciseId, completedAt }: Pick<WorkoutCompletion, "exerciseId" | "completedAt">,
+  { itemId, completedAt }: Pick<WorkoutCompletion, "itemId" | "completedAt">,
   now: number,
 ): boolean {
-  return EXPIRING_ITEM_IDS.has(exerciseId) && now - completedAt >= EXPIRY_TIME;
+  return EXPIRING_ITEM_IDS.has(itemId) && now - completedAt >= EXPIRY_TIME;
 }
 
 function isValidCompletion(value: unknown, now: number): value is WorkoutCompletion {
   if (typeof value !== "object" || value === null) return false;
-  const { exerciseId, dayId, completedAt } = value as Record<string, unknown>;
+  const { itemId, dayId, completedAt } = value as Record<string, unknown>;
   return (
-    typeof exerciseId === "string" &&
+    typeof itemId === "string" &&
     typeof dayId === "number" &&
-    ITEM_DAY_INDEX.get(exerciseId) === dayId &&
+    ITEM_DAY_INDEX.get(itemId) === dayId &&
     typeof completedAt === "number" &&
     Number.isFinite(completedAt) &&
     completedAt <= now + MAX_CLOCK_SKEW &&
-    !isExpired({ exerciseId, completedAt }, now)
+    !isExpired({ itemId, completedAt }, now)
   );
 }
 
@@ -61,6 +65,7 @@ function isValidCompletion(value: unknown, now: number): value is WorkoutComplet
 export function readCompletions(now: number = Date.now()): WorkoutCompletion[] {
   const storage = getStorage();
   if (!storage) return [];
+  migrateV1(storage);
 
   let raw: string | null;
   try {
@@ -91,10 +96,10 @@ export function readCompletions(now: number = Date.now()): WorkoutCompletion[] {
   const byId = new Map<string, WorkoutCompletion>();
   for (const entry of entries as unknown[]) {
     if (!isValidCompletion(entry, now)) continue;
-    const { exerciseId, dayId, completedAt } = entry;
-    const existing = byId.get(exerciseId);
+    const { itemId, dayId, completedAt } = entry;
+    const existing = byId.get(itemId);
     if (!existing || existing.completedAt < completedAt) {
-      byId.set(exerciseId, { exerciseId, dayId, completedAt });
+      byId.set(itemId, { itemId, dayId, completedAt });
     }
   }
 
@@ -161,7 +166,7 @@ function isValidWeightEntry(value: unknown, now: number): value is WeightEntry {
   const { exerciseId, kg, updatedAt } = value as Record<string, unknown>;
   return (
     typeof exerciseId === "string" &&
-    WEIGHT_ITEM_IDS.has(exerciseId) &&
+    WEIGHT_EXERCISE_IDS.has(exerciseId as ExerciseId) &&
     isValidWeight(kg) &&
     typeof updatedAt === "number" &&
     Number.isFinite(updatedAt) &&
@@ -177,6 +182,7 @@ function isValidWeightEntry(value: unknown, now: number): value is WeightEntry {
 export function readWeights(now: number = Date.now()): WeightEntry[] {
   const storage = getStorage();
   if (!storage) return [];
+  migrateV1(storage);
 
   let raw: string | null;
   try {
@@ -203,7 +209,7 @@ export function readWeights(now: number = Date.now()): WeightEntry[] {
     return [];
   }
 
-  const byId = new Map<string, WeightEntry>();
+  const byId = new Map<ExerciseId, WeightEntry>();
   for (const entry of entries as unknown[]) {
     if (!isValidWeightEntry(entry, now)) continue;
     const { exerciseId, kg, updatedAt } = entry;
@@ -233,7 +239,90 @@ export function writeWeights(weights: WeightEntry[]): void {
 
 /** Timestamp at which the earliest expiring completion expires, or `null`. */
 export function getNextExpiry(completions: WorkoutCompletion[]): number | null {
-  const expiring = completions.filter((c) => EXPIRING_ITEM_IDS.has(c.exerciseId));
+  const expiring = completions.filter((c) => EXPIRING_ITEM_IDS.has(c.itemId));
   if (expiring.length === 0) return null;
   return Math.min(...expiring.map((c) => c.completedAt)) + EXPIRY_TIME;
+}
+
+function readEntries(storage: Storage, key: string, field: string): unknown[] {
+  try {
+    const raw = storage.getItem(key);
+    if (raw === null) return [];
+    const parsed: unknown = JSON.parse(raw);
+    const list = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>)[field] : null;
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
+}
+
+/**
+ * Moves v1 data (keyed by plan-slot ids such as "d3-leg-extension") into the v2
+ * keys: ticks to the derived item ids, weights to catalog exercise ids. Entries
+ * are appended and the v2 readers dedupe by newest timestamp, so when two old
+ * slots map to the same exercise the most recent weight wins. Runs whenever v1
+ * keys are present — cheap, and it also picks up writes from a stale tab.
+ */
+function migrateV1(storage: Storage): void {
+  try {
+    const oldTicks = storage.getItem(LEGACY_STORAGE_KEY);
+    const oldWeights = storage.getItem(LEGACY_WEIGHTS_KEY);
+    if (oldTicks === null && oldWeights === null) return;
+
+    if (oldTicks !== null) {
+      const moved = readEntries(storage, LEGACY_STORAGE_KEY, "completions").flatMap((value) => {
+        const entry = asRecord(value);
+        const legacy = typeof entry?.exerciseId === "string" ? LEGACY_V1_IDS.get(entry.exerciseId) : undefined;
+        return entry && legacy ? [{ itemId: legacy.item, dayId: entry.dayId, completedAt: entry.completedAt }] : [];
+      });
+      if (moved.length > 0) {
+        const current = readEntries(storage, STORAGE_KEY, "completions");
+        storage.setItem(STORAGE_KEY, JSON.stringify({ completions: [...current, ...moved] }));
+      }
+      storage.removeItem(LEGACY_STORAGE_KEY);
+    }
+
+    if (oldWeights !== null) {
+      const moved = readEntries(storage, LEGACY_WEIGHTS_KEY, "weights").flatMap((value) => {
+        const entry = asRecord(value);
+        const legacy = typeof entry?.exerciseId === "string" ? LEGACY_V1_IDS.get(entry.exerciseId) : undefined;
+        return entry && legacy
+          ? [{ exerciseId: legacy.exercise, kg: entry.kg, updatedAt: entry.updatedAt }]
+          : [];
+      });
+      if (moved.length > 0) {
+        const current = readEntries(storage, WEIGHTS_KEY, "weights");
+        storage.setItem(WEIGHTS_KEY, JSON.stringify({ weights: [...current, ...moved] }));
+      }
+      storage.removeItem(LEGACY_WEIGHTS_KEY);
+    }
+  } catch {
+    // Storage blocked or full — leave v1 in place and try again on the next read.
+  }
+}
+
+let persistRequested = false;
+
+/**
+ * Asks the browser to exempt our data from eviction (e.g. Safari's 7-day cap
+ * on script-written storage). Called after a user action, because some
+ * browsers may show a prompt. Fire-and-forget; failure changes nothing.
+ */
+export function requestPersistentStorage(): void {
+  if (persistRequested || typeof navigator === "undefined") return;
+  persistRequested = true;
+  try {
+    const manager = navigator.storage;
+    if (!manager?.persist || !manager.persisted) return;
+    manager
+      .persisted()
+      .then((persisted) => (persisted ? undefined : manager.persist()))
+      .catch(() => {});
+  } catch {
+    // Unsupported — nothing to do.
+  }
 }

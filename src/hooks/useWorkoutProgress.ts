@@ -9,6 +9,7 @@ import {
   readSelectedDay,
   readSelectedLevel,
   readWeights,
+  requestPersistentStorage,
   SELECTED_DAY_KEY,
   SELECTED_LEVEL_KEY,
   STORAGE_KEY,
@@ -22,6 +23,7 @@ import { getChecklist, getPlanItemIds, getRequiredItems } from "@/data/workouts"
 import type {
   CompletionDayId,
   DayId,
+  ExerciseId,
   LevelId,
   WeightEntry,
   WorkoutCompletion,
@@ -34,10 +36,10 @@ export type LoggedWeight = Pick<WeightEntry, "kg" | "updatedAt">;
 type Snapshot = {
   selectedDay: DayId;
   selectedLevel: LevelId;
-  /** exerciseId → completedAt */
+  /** itemId → completedAt */
   completions: ReadonlyMap<string, number>;
   /** exerciseId → last logged weight */
-  weights: ReadonlyMap<string, LoggedWeight>;
+  weights: ReadonlyMap<ExerciseId, LoggedWeight>;
 };
 
 /** Safety-net re-check while the app is open, independent of the expiry timer. */
@@ -67,7 +69,7 @@ function load(): void {
     selectedDay,
     selectedLevel,
     stored
-      .map((c) => `${c.exerciseId}:${c.completedAt}`)
+      .map((c) => `${c.itemId}:${c.completedAt}`)
       .sort()
       .join(","),
     weights
@@ -80,7 +82,7 @@ function load(): void {
     snapshot = {
       selectedDay,
       selectedLevel,
-      completions: new Map(stored.map((c) => [c.exerciseId, c.completedAt])),
+      completions: new Map(stored.map((c) => [c.itemId, c.completedAt])),
       weights: new Map(weights.map((w) => [w.exerciseId, { kg: w.kg, updatedAt: w.updatedAt }])),
     };
   }
@@ -178,7 +180,8 @@ export function useWorkoutProgress() {
   }, []);
 
   /** Saves the weight for an exercise, or removes it when `kg` is `null`. */
-  const setWeight = useCallback((exerciseId: string, kg: number | null) => {
+  const setWeight = useCallback((exerciseId: ExerciseId, kg: number | null) => {
+    requestPersistentStorage();
     const now = Date.now();
     const next = readWeights(now).filter((w) => w.exerciseId !== exerciseId);
     if (kg !== null && isValidWeight(kg)) next.push({ exerciseId, kg, updatedAt: now });
@@ -187,15 +190,16 @@ export function useWorkoutProgress() {
   }, []);
 
   const weightFor = useCallback(
-    (exerciseId: string): LoggedWeight | null => state?.weights.get(exerciseId) ?? null,
+    (exerciseId: ExerciseId): LoggedWeight | null => state?.weights.get(exerciseId) ?? null,
     [state],
   );
 
-  const setCompleted = useCallback((exerciseId: string, dayId: CompletionDayId, completed: boolean) => {
+  const setCompleted = useCallback((itemId: string, dayId: CompletionDayId, completed: boolean) => {
+    requestPersistentStorage();
     const now = Date.now();
     // Re-read so we never write back entries that expired since the last render.
-    const next = readCompletions(now).filter((c) => c.exerciseId !== exerciseId);
-    if (completed) next.push({ exerciseId, dayId, completedAt: now });
+    const next = readCompletions(now).filter((c) => c.itemId !== itemId);
+    if (completed) next.push({ itemId, dayId, completedAt: now });
     writeCompletions(next);
     refresh();
   }, []);
@@ -203,18 +207,18 @@ export function useWorkoutProgress() {
   const resetDay = useCallback((day: WorkoutDay) => {
     // Match on the day's own items: day ids alone aren't unique across plans.
     const ids = new Set(getChecklist(day).map((item) => item.id));
-    writeCompletions(readCompletions(Date.now()).filter((c) => !ids.has(c.exerciseId)));
+    writeCompletions(readCompletions(Date.now()).filter((c) => !ids.has(c.itemId)));
     refresh();
   }, []);
 
   const isCompleted = useCallback(
-    (exerciseId: string) => state?.completions.has(exerciseId) ?? false,
+    (itemId: string) => state?.completions.has(itemId) ?? false,
     [state],
   );
 
   const resetCycle = useCallback((plan: WorkoutPlan) => {
     const ids = getPlanItemIds(plan);
-    writeCompletions(readCompletions(Date.now()).filter((c) => !ids.has(c.exerciseId)));
+    writeCompletions(readCompletions(Date.now()).filter((c) => !ids.has(c.itemId)));
     refresh();
   }, []);
 

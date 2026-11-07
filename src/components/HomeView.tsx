@@ -5,6 +5,7 @@ import { LevelPicker } from "@/components/LevelPicker";
 import { PlanCards } from "@/components/PlanCards";
 import { StepLabel } from "@/components/StepLabel";
 import { WarmupCard } from "@/components/WarmupCard";
+import { WeightsCard } from "@/components/WeightsCard";
 import { getLevel, getPlansForLevel, WARMUP_ITEM } from "@/data/workouts";
 import { useWorkoutProgress } from "@/hooks/useWorkoutProgress";
 
@@ -67,6 +68,9 @@ export function HomeView() {
             </section>
           </div>
         )}
+
+        {/* Outside the level wrapper: weights belong to no single level, so it stays brand lime. */}
+        <WeightsCard />
       </div>
     </>
   );

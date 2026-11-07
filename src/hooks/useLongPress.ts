@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 
 /** How long a row must be held before the long-press action fires. */
-export const HOLD_DURATION = 2000;
+export const HOLD_DURATION = 1000;
 /** Movement beyond this many px means the user is scrolling, not holding. */
 const MOVE_TOLERANCE = 10;
 

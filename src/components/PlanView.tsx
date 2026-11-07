@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Hourglass } from "lucide-react";
+import { Hourglass, Weight } from "lucide-react";
 
+import { BackHeader, iconLinkClass } from "@/components/BackHeader";
 import { CycleTracker } from "@/components/CycleTracker";
 import { DaySelector, dayTabId } from "@/components/DaySelector";
 import { LevelProvider } from "@/components/LevelTheme";
@@ -16,26 +17,16 @@ const DAY_PANEL_ID = "workout-panel";
 
 function PlanHeader({ plan }: { plan: WorkoutPlan | null }) {
   return (
-    <header className="flex items-center gap-3">
-      <Link
-        href="/"
-        aria-label="Back to home"
-        className="grid size-11 shrink-0 place-items-center rounded-xl border border-border bg-card outline-none transition-colors hover:border-primary/60 hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/60 active:scale-95"
-      >
-        <ArrowLeft className="size-5" aria-hidden />
-      </Link>
-      <div className="min-w-0">
-        <p className="text-[11px] font-bold tracking-widest text-muted-foreground uppercase">
-          SAAD <span className="text-primary">GYM</span>
-          {plan && <> · {getLevel(plan.level).name}</>}
-        </p>
-        {plan ? (
-          <h1 className="text-2xl leading-tight font-black tracking-tight">{plan.name}</h1>
-        ) : (
-          <div aria-hidden className="mt-1 h-7 w-24 animate-pulse rounded bg-card" />
-        )}
-      </div>
-    </header>
+    <BackHeader
+      eyebrow={plan && getLevel(plan.level).name}
+      title={plan?.name ?? null}
+      action={
+        // Lets the lifter check their numbers mid-workout without going home.
+        <Link href="/weights" prefetch aria-label="My weights" className={iconLinkClass}>
+          <Weight className="size-5" aria-hidden />
+        </Link>
+      }
+    />
   );
 }
 

@@ -8,7 +8,7 @@ import { ExerciseItem } from "@/components/ExerciseItem";
 import { WeightDialog } from "@/components/WeightDialog";
 import { getChecklist } from "@/data/workouts";
 import type { LoggedWeight } from "@/hooks/useWorkoutProgress";
-import type { ChecklistItem, DayId, WorkoutDay } from "@/types/workout";
+import type { ChecklistItem, DayId, ExerciseId, WorkoutDay } from "@/types/workout";
 
 type WorkoutCardProps = {
   day: WorkoutDay;
@@ -16,8 +16,8 @@ type WorkoutCardProps = {
   labelledBy: string;
   isCompleted: (itemId: string) => boolean;
   onToggle: (itemId: string, dayId: DayId, completed: boolean) => void;
-  weightFor: (itemId: string) => LoggedWeight | null;
-  onSaveWeight: (itemId: string, kg: number | null) => void;
+  weightFor: (exerciseId: ExerciseId) => LoggedWeight | null;
+  onSaveWeight: (exerciseId: ExerciseId, kg: number | null) => void;
   onReset: () => void;
   hasProgress: boolean;
 };
@@ -35,13 +35,22 @@ export function WorkoutCard({
 }: WorkoutCardProps) {
   const [weightOpen, setWeightOpen] = useState(false);
   // Kept after closing so the dialog still has content while it animates out.
-  const [editing, setEditing] = useState<{ id: string; name: string; session: number } | null>(
-    null,
-  );
+  // `id` is the row (for returning focus); weights are keyed by `exerciseId`.
+  const [editing, setEditing] = useState<{
+    id: string;
+    exerciseId: ExerciseId;
+    name: string;
+    session: number;
+  } | null>(null);
   const canLogWeight = !day.isRecovery;
 
   const openWeight = (item: ChecklistItem) => {
-    setEditing((prev) => ({ id: item.id, name: item.name, session: (prev?.session ?? 0) + 1 }));
+    setEditing((prev) => ({
+      id: item.id,
+      exerciseId: item.exerciseId,
+      name: item.name,
+      session: (prev?.session ?? 0) + 1,
+    }));
     setWeightOpen(true);
   };
 
@@ -59,7 +68,7 @@ export function WorkoutCard({
           index={day.isRecovery ? null : i + 1}
           checked={isCompleted(item.id)}
           onCheckedChange={(checked) => onToggle(item.id, day.id, checked)}
-          weight={canLogWeight ? weightFor(item.id) : null}
+          weight={canLogWeight ? weightFor(item.exerciseId) : null}
           onEditWeight={canLogWeight ? () => openWeight(item) : undefined}
         />
       ))}
@@ -118,8 +127,8 @@ export function WorkoutCard({
           open={weightOpen}
           onOpenChange={setWeightOpen}
           exercise={editing}
-          weight={editing ? weightFor(editing.id) : null}
-          onSave={(kg) => editing && onSaveWeight(editing.id, kg)}
+          weight={editing ? weightFor(editing.exerciseId) : null}
+          onSave={(kg) => editing && onSaveWeight(editing.exerciseId, kg)}
         />
       )}
     </section>

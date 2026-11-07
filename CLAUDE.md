@@ -32,8 +32,9 @@ Before calling a change done, run `lint`, `tsc` and `build`, and make sure all t
 
 | Route | Component | Content |
 | --- | --- | --- |
-| `/` | `HomeView` | Header, welcome line, 10-min warm-up checkbox (step 1), experience level picker (step 2), plan cards for that level (step 3) |
-| `/plan/[planId]` | `PlanView` | Cycle tracker, day tabs, day progress, exercise checklist with weight logging |
+| `/` | `HomeView` | Header, welcome line, 10-min warm-up checkbox (step 1), experience level picker (step 2), plan cards for that level (step 3), "My weights" card |
+| `/plan/[planId]` | `PlanView` | Cycle tracker, day tabs, day progress, exercise checklist with weight logging; header links to `/weights` |
+| `/weights` | `WeightsView` | "My weights": every weighted exercise grouped by body part, with its last weight and date; tap a row to edit |
 
 Plan ids are slugs, `<level>-<n>` (e.g. `beginner-1`). `generateStaticParams` prerenders every plan in `WORKOUT_PLANS`, and any other id renders `notFound()`. `next.config.ts` redirects the old `/plan/1` and `/plan/2` URLs.
 
@@ -43,11 +44,15 @@ Plan ids are slugs, `<level>-<n>` (e.g. `beginner-1`). `generateStaticParams` pr
 src/
 ├── app/                    layout (dark theme, footer), home page, plan/[planId] page, globals.css
 ├── components/             feature components (one per file, PascalCase); ui/ = shadcn primitives
-├── data/workouts.ts        routine data + lookup helpers (getPlan, getDay, getChecklist, getRequiredItems, ...)
+├── data/exercises.ts       exercise catalog: every exercise once, keyed by a stable id (EXERCISES, ExerciseId)
+├── data/plans.ts           levels + plans; each day lists exercise ids (PLAN_DEFS, EXPERIENCE_LEVELS)
+├── data/workouts.ts        resolves plans against the catalog + lookup helpers (getPlan, getDay, getChecklist, ...)
 ├── hooks/useWorkoutProgress.ts   the single store/hook for all progress, level and weight state
 ├── hooks/useLongPress.ts   press-and-hold gesture (opens the weight editor)
 ├── lib/storage.ts          localStorage read/validate/prune/write
 ├── lib/format.ts           date and kg formatting
+├── lib/legacyIds.ts        frozen v1 id → v2 id table, used only by the storage migration
+├── lib/appIcon.tsx         app icon drawing (ImageResponse) for app/icon.tsx, app/apple-icon.tsx, app/manifest.ts
 └── types/workout.ts        DayId, LevelId, PlanId, Exercise, WorkoutDay, WorkoutPlan, WorkoutCompletion, WeightEntry
 ```
 
@@ -55,20 +60,23 @@ src/
 
 - **Workout data is user-provided and must be entered exactly as given.** Don't rename exercises or reorder them. Sets and reps were removed at the user's request and are not shown; don't add them back unless asked.
 - **Levels and plans:** `EXPERIENCE_LEVELS` holds Beginner, Intermediate and Advanced (Pro). Each plan in `WORKOUT_PLANS` has a `level` and a `number`. A plan with `days: []` renders as "Coming soon". Only Beginner Plan 1 has data for now.
-- **Exercise ids** are stable slugs, used as storage keys for ticks and weights. Renaming one silently drops saved progress.
-  - Beginner Plan 1 keeps its original `d1-…` ids. Give every new plan's ids a plan prefix (e.g. `b2-d1-…`, `i1-d1-…`, `a1-d1-…`) so they never collide.
+- **Exercises live in one catalog** (`src/data/exercises.ts`), and plans (`src/data/plans.ts`) reference them by id. A day slot is an `ExerciseId`, or `{ exercise, name?, optional? }` for a slot-only label or an optional extra. A typo in a reference fails `tsc`.
+  - Each weighted exercise has a `group` (`MUSCLE_GROUPS`: chest, back, shoulders, legs, arms) that places it on `/weights` (`WEIGHT_GROUPS` in `workouts.ts`). Untagged ones land under "Other". These tags are Claude's classification, not user-given data, so the user may move them.
+  - **Catalog ids are weight storage keys.** Renaming one silently drops its saved weight. Names can change freely. Add a new exercise to the catalog once and reuse it across days and plans.
+  - **Tick keys are derived**, never written by hand: `<planId>/<dayId>/<exerciseId>`, plus `#2`, `#3`… for repeats within a day (`resolveDay` in `workouts.ts`). Reordering slots is safe, but moving an exercise to another day or plan changes its key and drops that tick.
 - **Warm-up:** a single global item (`WARMUP_ITEM`, `dayId` 0) on the home page. It is the only item that expires, 4 hours after it is ticked (`EXPIRING_ITEM_IDS`).
 - **Cycle:** exercise ticks persist until the user resets them. A day is done when all of its *required* items are ticked, and a cycle is complete when all 6 days are done, in any order.
   - Finishing the last day opens a celebration dialog. "Start new cycle" clears every plan item, keeps the warm-up, and returns to Day 1.
   - "Reset cycle" and "Reset Day N" both ask for confirmation.
 - **Day 4 (recovery):** "Rest day done" is the only required item. Walking, Cycling and Battle Rope are `optional: true` and don't count towards progress.
-- **Weights:** every exercise on a non-recovery day (`WEIGHT_ITEM_IDS`) can hold one weight in kg, the last one logged. It is edited by holding the row for 2 s (`HOLD_DURATION`) or tapping its `kg` button. Weights are never cleared by "Reset Day", "Reset cycle" or "Start new cycle".
+- **Weights:** every exercise used on a non-recovery day (`WEIGHT_EXERCISE_IDS`) can hold one weight in kg, the last one logged. It is keyed by catalog id, so it is shared across every day and plan that uses the exercise. It is edited by holding the row for 1 s (`HOLD_DURATION`), tapping its `kg` button, or tapping its row on `/weights`. Weights are never cleared by "Reset Day", "Reset cycle" or "Start new cycle".
 
 ## State and storage
 
 - Keys. Changing a stored shape needs a new key version or a migration.
-  - `saad-gym-workout-v1` holds `{ completions: [{ exerciseId, dayId, completedAt }] }`.
-  - `saad-gym-weights-v1` holds `{ weights: [{ exerciseId, kg, updatedAt }] }`. `readWeights` validates it the same way (`0 < kg ≤ 999`).
+  - `saad-gym-workout-v2` holds `{ completions: [{ itemId, dayId, completedAt }] }`.
+  - `saad-gym-weights-v2` holds `{ weights: [{ exerciseId, kg, updatedAt }] }`, where `exerciseId` is a catalog id. `readWeights` validates it the same way (`0 < kg ≤ 999`).
+  - The v1 keys (keyed by old slot ids like `d3-leg-extension`) are migrated by `migrateV1` in `storage.ts` through the frozen `LEGACY_V1_IDS` table, then removed. Never edit that table when plans change.
   - `saad-gym-selected-day-v1` holds the selected day, and `saad-gym-selected-level-v1` holds the selected level.
 - Only completions and weights are stored. Progress, "day done" and "cycle complete" are always derived and never persisted.
 - `readCompletions` validates every entry: the id must be known, the `dayId` must match `ITEM_DAY_INDEX`, the timestamp must be finite and not in the future, and the entry must not be expired. It dedupes, then writes the cleaned list back. Corrupt data is cleared, not thrown.
@@ -77,6 +85,7 @@ src/
   - It re-reads on a timer aimed at the next warm-up expiry, a 30s poll, `visibilitychange` / `focus` / `pageshow`, and the cross-tab `storage` event.
   - `Date.now()` is the source of truth. Timers only trigger re-checks.
 - Wrap every `localStorage` access in try/catch, because private mode or blocked storage must not crash the app.
+- `requestPersistentStorage()` asks the browser not to evict our data. It runs on the first tick or weight save, because Firefox may prompt. `app/manifest.ts` makes the app installable, and an installed app is exempt from Safari's 7-day deletion of site data.
 
 ## Conventions
 

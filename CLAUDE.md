@@ -42,7 +42,7 @@ Plan ids are slugs, `<level>-<n>` (e.g. `beginner-1`). `generateStaticParams` pr
 
 ```
 src/
-├── app/                    layout (dark theme, footer), home page, plan/[planId] page, globals.css
+├── app/                    layout (dark theme, footer), home page, plan/[planId] page, globals.css; icon.png, apple-icon.png, manifest.ts
 ├── components/             feature components (one per file, PascalCase); ui/ = shadcn primitives
 ├── data/exercises.ts       exercise catalog: every exercise once, keyed by a stable id (EXERCISES, ExerciseId)
 ├── data/plans.ts           levels + plans; each day lists exercise ids (PLAN_DEFS, EXPERIENCE_LEVELS)
@@ -52,7 +52,6 @@ src/
 ├── lib/storage.ts          localStorage read/validate/prune/write
 ├── lib/format.ts           date and kg formatting
 ├── lib/legacyIds.ts        frozen v1 id → v2 id table, used only by the storage migration
-├── lib/appIcon.tsx         app icon drawing (ImageResponse) for app/icon.tsx, app/apple-icon.tsx, app/manifest.ts
 └── types/workout.ts        DayId, LevelId, PlanId, Exercise, WorkoutDay, WorkoutPlan, WorkoutCompletion, WeightEntry
 ```
 
@@ -91,6 +90,7 @@ src/
 
 - Only add `"use client"` where it's needed: the views and interactive components. Pages stay server components.
 - One-shot effects (confetti, the cycle dialog) fire only on a *transition* to complete. Use the "adjust state during render" pattern (`wasComplete` vs `isComplete`) rather than effects that set state, because the React Compiler lint rules reject those.
+- Logo: `public/logo.jpg` is the user's gym logo (shown in the home header). The app icons are resized from it with `sips`: `src/app/icon.png` (48), `src/app/apple-icon.png` (180), `public/icons/icon-{192,512}.png` and `icon-maskable-512.png` (padded to 1600 on black first so Android's circular crop keeps the barbell). Regenerate all of them if the logo changes.
 - Theme:
   - Dark only: background `#09090B`, cards `#18181B`, lime accent `#A3E635` (`primary`).
   - Rounded `2xl`/`3xl` cards and bold tracking-tight headings.

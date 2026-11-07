@@ -1,11 +1,17 @@
-import { Dumbbell } from "lucide-react";
+import Image from "next/image";
 
 export function Header() {
   return (
     <header className="flex items-center gap-3">
-      <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-[0_0_32px_-6px] shadow-primary/60">
-        <Dumbbell className="size-6" strokeWidth={2.5} aria-hidden />
-      </div>
+      {/* Decorative: the heading beside it already names the gym. */}
+      <Image
+        src="/logo.jpg"
+        alt=""
+        width={64}
+        height={64}
+        loading="eager"
+        className="size-16 shrink-0 rounded-2xl border border-border"
+      />
       <div className="min-w-0">
         <h1 className="text-2xl leading-none font-black tracking-tight">
           SAAD <span className="text-primary">GYM</span>
